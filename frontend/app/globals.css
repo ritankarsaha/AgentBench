@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  /* AgentBench design system — precision instrument, not a social feed. */
+  --bg: #08080d;
+  --surface: #0f0f1a;
+  --border: #1a1a2e;
+
+  --accent: #7c3aed;
+  --accent-verified: #f59e0b;
+  --accent-pass: #22c55e;
+  --accent-fail: #ef4444;
+  --accent-model: #38bdf8;
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
+
+  --radius-card: 8px;
+  --radius-row: 4px;
+  --radius-badge: 999px;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+
+  --color-accent: var(--accent);
+  --color-accent-verified: var(--accent-verified);
+  --color-accent-pass: var(--accent-pass);
+  --color-accent-fail: var(--accent-fail);
+  --color-accent-model: var(--accent-model);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  --radius-card: var(--radius-card);
+  --radius-row: var(--radius-row);
+  --radius-badge: var(--radius-badge);
+
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+}

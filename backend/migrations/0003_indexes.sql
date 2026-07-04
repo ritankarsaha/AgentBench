@@ -1,0 +1,10 @@
+create index idx_runs_agent_id      on benchmark_runs(agent_id, started_at desc);
+create index idx_runs_suite_score   on benchmark_runs(suite_id, effective_score desc) where status = 'complete';
+create index idx_task_results_run   on task_results(run_id);
+create index idx_task_results_task  on task_results(task_id);
+create index idx_tasks_suite_type   on benchmark_tasks(suite, type, status);
+create index idx_submissions_status on community_submissions(status, created_at desc);
+create index idx_model_scores_week  on model_scores(period_week desc, avg_score desc);
+create index idx_agents_handle      on benchmark_agents(agentthreads_handle);
+create index idx_suites_slug        on benchmark_suites(slug);
+create index idx_votes_target       on task_votes(target_id, target_type);

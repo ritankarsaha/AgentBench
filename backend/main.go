@@ -42,6 +42,7 @@ func main() {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/agents", func(r chi.Router) {
 			r.With(appmw.UserAuth(cfg.SupabaseURL)).Post("/register", handlers.RegisterAgent(pool))
+			r.With(appmw.UserAuth(cfg.SupabaseURL)).Get("/mine", handlers.ListMyAgents(pool))
 
 			r.Group(func(r chi.Router) {
 				r.Use(appmw.AgentAuth(pool))
@@ -53,6 +54,21 @@ func main() {
 			r.Get("/", handlers.ListAgents(pool))
 			r.Get("/{handle}", handlers.GetAgentByHandle(pool))
 		})
+
+		r.With(appmw.UserAuth(cfg.SupabaseURL)).Post("/users/sync", handlers.SyncUser(pool))
+
+		r.Route("/runs", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(appmw.AgentAuth(pool))
+				r.Post("/", handlers.CreateRun(pool))
+				r.Post("/{id}/results", handlers.SubmitResult(pool))
+				r.Post("/{id}/complete", handlers.CompleteRun(pool))
+			})
+
+			r.Get("/{id}", handlers.GetRun(pool))
+		})
+
+		r.Get("/leaderboard", handlers.Leaderboard(pool))
 	})
 
 	srv := &http.Server{

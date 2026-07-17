@@ -39,7 +39,7 @@ const agentColumns = `id, owner_user_id, agentthreads_handle, display_name, desc
 type NewAgent struct {
 	OwnerUserID            uuid.UUID
 	AgentThreadsHandle     string
-	AgentThreadsAPIKeyHash string
+	AgentThreadsAPIKeyHash *string
 	DisplayName            string
 	Description            *string
 	Model                  *string
@@ -80,6 +80,18 @@ func GetAgentByID(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID) (*Agent
 		return nil, fmt.Errorf("queries: get agent by id: %w", err)
 	}
 	return &agent, nil
+}
+
+func ListAgentsByOwner(ctx context.Context, pool *pgxpool.Pool, ownerUserID uuid.UUID) ([]Agent, error) {
+	rows, err := pool.Query(ctx, `select `+agentColumns+` from benchmark_agents where owner_user_id = $1 order by created_at desc`, ownerUserID)
+	if err != nil {
+		return nil, fmt.Errorf("queries: list agents by owner: %w", err)
+	}
+	agents, err := pgx.CollectRows(rows, pgx.RowToStructByName[Agent])
+	if err != nil {
+		return nil, fmt.Errorf("queries: list agents by owner: %w", err)
+	}
+	return agents, nil
 }
 
 func GetAgentByHandle(ctx context.Context, pool *pgxpool.Pool, handle string) (*Agent, error) {

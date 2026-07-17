@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -18,6 +19,8 @@ import (
 const AgentContextKey contextKey = "agent"
 
 const agentAuthCacheTTL = 60 * time.Second
+
+var ErrInvalidAgentToken = errors.New("invalid api key")
 
 type cachedAgentAuth struct {
 	agent     *queries.Agent
@@ -38,38 +41,47 @@ func AgentAuth(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 				return
 			}
 
-			cacheKey := hashToken(token)
-			if cached, ok := agentAuthCache.Load(cacheKey); ok {
-				entry := cached.(cachedAgentAuth)
-				if time.Now().Before(entry.expiresAt) {
-					next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), AgentContextKey, entry.agent)))
-					return
-				}
-				agentAuthCache.Delete(cacheKey)
-			}
-
-			agentID, secret, ok := apikey.Parse(token)
-			if !ok {
-				response.WriteError(w, http.StatusUnauthorized, "invalid_token", "invalid api key")
-				return
-			}
-
-			hash, err := queries.GetAgentAPIKeyHash(r.Context(), pool, agentID)
-			if err != nil || !apikey.Verify(hash, secret) {
-				response.WriteError(w, http.StatusUnauthorized, "invalid_token", "invalid api key")
-				return
-			}
-
-			agent, err := queries.GetAgentByID(r.Context(), pool, agentID)
+			agent, err := VerifyAgentToken(r.Context(), pool, token)
 			if err != nil {
 				response.WriteError(w, http.StatusUnauthorized, "invalid_token", "invalid api key")
 				return
 			}
 
-			agentAuthCache.Store(cacheKey, cachedAgentAuth{agent: agent, expiresAt: time.Now().Add(agentAuthCacheTTL)})
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), AgentContextKey, agent)))
 		})
 	}
+}
+
+// VerifyAgentToken validates a plaintext "ab_..." key and returns the
+// associated agent, using the same 60s cache as the AgentAuth middleware.
+
+func VerifyAgentToken(ctx context.Context, pool *pgxpool.Pool, token string) (*queries.Agent, error) {
+	cacheKey := hashToken(token)
+	if cached, ok := agentAuthCache.Load(cacheKey); ok {
+		entry := cached.(cachedAgentAuth)
+		if time.Now().Before(entry.expiresAt) {
+			return entry.agent, nil
+		}
+		agentAuthCache.Delete(cacheKey)
+	}
+
+	agentID, secret, ok := apikey.Parse(token)
+	if !ok {
+		return nil, ErrInvalidAgentToken
+	}
+
+	hash, err := queries.GetAgentAPIKeyHash(ctx, pool, agentID)
+	if err != nil || !apikey.Verify(hash, secret) {
+		return nil, ErrInvalidAgentToken
+	}
+
+	agent, err := queries.GetAgentByID(ctx, pool, agentID)
+	if err != nil {
+		return nil, ErrInvalidAgentToken
+	}
+
+	agentAuthCache.Store(cacheKey, cachedAgentAuth{agent: agent, expiresAt: time.Now().Add(agentAuthCacheTTL)})
+	return agent, nil
 }
 
 func hashToken(token string) string {
@@ -80,4 +92,8 @@ func hashToken(token string) string {
 func AgentFromContext(ctx context.Context) (*queries.Agent, bool) {
 	v, ok := ctx.Value(AgentContextKey).(*queries.Agent)
 	return v, ok
+}
+
+func BearerToken(r *http.Request) string {
+	return bearerToken(r)
 }

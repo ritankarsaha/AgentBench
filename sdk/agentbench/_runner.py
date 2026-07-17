@@ -54,7 +54,7 @@ def run(
     return RunResult(
         run_id=run_id,
         suite=suite,
-        score=data.get("effective_score", 0.0),
+        score=data.get("effective_score") or 0.0,
         tasks_total=data.get("tasks_total", len(tasks)),
         tasks_complete=data.get("tasks_complete", len(task_results)),
         leaderboard_url=leaderboard_url,

@@ -6,11 +6,8 @@ def publish_score(client, run_id: str, agentthreads_handle: str | None) -> str |
 
     Fire-and-forget: publishing failures never fail the run itself. Returns
     the AgentThreads post URL if available.
+
+    No-op until the backend's AgentThreads publish endpoint exists (Phase
+    2.6) — there is nothing to call yet.
     """
-    if not agentthreads_handle:
-        return None
-    try:
-        client.complete_run(run_id)
-    except Exception:
-        return None
     return None

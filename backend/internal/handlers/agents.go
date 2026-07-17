@@ -18,7 +18,7 @@ import (
 
 type registerAgentRequest struct {
 	AgentThreadsHandle string  `json:"agentthreads_handle"`
-	AgentThreadsAPIKey string  `json:"agentthreads_api_key"`
+	AgentThreadsAPIKey *string `json:"agentthreads_api_key"`
 	DisplayName        string  `json:"display_name"`
 	Description        *string `json:"description"`
 	Model              *string `json:"model"`
@@ -43,8 +43,8 @@ func RegisterAgent(pool *pgxpool.Pool) http.HandlerFunc {
 			response.WriteError(w, http.StatusBadRequest, "invalid_body", "malformed JSON body")
 			return
 		}
-		if req.AgentThreadsHandle == "" || req.AgentThreadsAPIKey == "" || req.DisplayName == "" {
-			response.WriteError(w, http.StatusBadRequest, "missing_fields", "agentthreads_handle, agentthreads_api_key, and display_name are required")
+		if req.AgentThreadsHandle == "" || req.DisplayName == "" {
+			response.WriteError(w, http.StatusBadRequest, "missing_fields", "agentthreads_handle and display_name are required")
 			return
 		}
 
@@ -54,10 +54,15 @@ func RegisterAgent(pool *pgxpool.Pool) http.HandlerFunc {
 			response.WriteError(w, http.StatusInternalServerError, "key_generation_failed", "failed to generate api key")
 			return
 		}
-		agentThreadsHash, err := apikey.HashArbitrary(req.AgentThreadsAPIKey)
-		if err != nil {
-			response.WriteError(w, http.StatusInternalServerError, "key_generation_failed", "failed to process agentthreads api key")
-			return
+
+		var agentThreadsHash *string
+		if req.AgentThreadsAPIKey != nil && *req.AgentThreadsAPIKey != "" {
+			hash, err := apikey.HashArbitrary(*req.AgentThreadsAPIKey)
+			if err != nil {
+				response.WriteError(w, http.StatusInternalServerError, "key_generation_failed", "failed to process agentthreads api key")
+				return
+			}
+			agentThreadsHash = &hash
 		}
 
 		agent, err := queries.CreateAgent(r.Context(), pool, agentID, queries.NewAgent{
@@ -226,5 +231,29 @@ func GetAgentByHandle(pool *pgxpool.Pool) http.HandlerFunc {
 			"agent":       agent,
 			"recent_runs": runs,
 		})
+	}
+}
+
+func ListMyAgents(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.UserIDFromContext(r.Context())
+		if !ok {
+			response.WriteError(w, http.StatusUnauthorized, "missing_user", "user authentication required")
+			return
+		}
+
+		ownerID, err := uuid.Parse(userID)
+		if err != nil {
+			response.WriteError(w, http.StatusUnauthorized, "invalid_user", "invalid user id")
+			return
+		}
+
+		agents, err := queries.ListAgentsByOwner(r.Context(), pool, ownerID)
+		if err != nil {
+			response.WriteError(w, http.StatusInternalServerError, "list_failed", "failed to list agents")
+			return
+		}
+
+		response.WriteOK(w, http.StatusOK, agents)
 	}
 }
